@@ -21,7 +21,7 @@ def main():
     # ===================== Set page config and background =======================
     # Main panel setup
     # Set website details
-    st.set_page_config(page_title ="Webrtc object detection", 
+    st.set_page_config(page_title="Shopylytics object detection",
                        page_icon=':camera:', 
                        layout='centered')
     
@@ -41,11 +41,11 @@ def main():
     help.sub_text(text)
     
     # Set expander with references and special mentions
-    #help.expander()
+    help.expander()
     
     
-    # ======================= Get Yolo Model details ==========================
-    labels, colors, height, width, model = detect.define_tf_lite_model()
+    # ======================= Get tf lite model details ==========================
+    labels, colors, height, width, interpreter = detect.define_tf_lite_model()
     
     # ============================= Main app =====================================
     option = st.selectbox(
@@ -72,7 +72,7 @@ def main():
                                                       height, 
                                                       width,
                                                       file_name, 
-                                                      model, 
+                                                      interpreter, 
                                                       threshold=0.5)
             st.image(Image.fromarray(object_detection), 
                      use_column_width=True)
@@ -98,7 +98,7 @@ def main():
                                                      height, 
                                                      width,
                                                      "tempDir/" + uploaded_file.name, 
-                                                     model, 
+                                                     interpreter, 
                                                      threshold=0.5)
             
             st.image(Image.fromarray(resultant_image), use_column_width=True)

@@ -12,9 +12,8 @@ import cv2
 import tensorflow as tf
 import re
 import helper as help
-from ultralytics import YOLO
 
-def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, model, threshold):
+def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, interpreter, threshold):
     '''
     
     Main function to read and prepare input, draw boxes and return image
@@ -26,7 +25,7 @@ def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, model, threshold)
     HEIGHT : Image height defined in define_tf_lite_model()
     WIDTH : Image width in define_tf_lite_model()
     image_path : Where to get the image from, in this app TempDir
-    model : Yolo tarained model defined in define_tf_lite_model()
+    interpreter : Interpreter defined in define_tf_lite_model()
     threshold : The accuracy threshold.
 
     Returns
@@ -35,29 +34,28 @@ def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, model, threshold)
 
     '''
     # Load the input image and preprocess it
-    #input_type = interpreter.get_input_details()[0]['dtype']
+    input_type = interpreter.get_input_details()[0]['dtype']
     preprocessed_image, original_image = preprocess_image(HEIGHT, WIDTH, image_path, input_type)
     
     # =============Perform inference=====================
-    results=model(img,stream=True)
-    
-    #results = detect_objects(interpreter, preprocessed_image, threshold=threshold)
+    results = detect_objects(interpreter, preprocessed_image, threshold=threshold)
 
     # =============Display the results====================
     original_numpy = original_image.numpy()
     counter = 0
-    for result in results:
+    for obj in results:
         # set counter of text
         counter = counter + 1
         # Convert the bounding box figures from relative coordinates
         # to absolute coordinates based on the original resolution
-        boxes = result.boxes  # Boxes object for bbox outputs
-        masks = result.masks  # Masks object for segmentation masks outputs
-        keypoints = result.keypoints  # Keypoints object for pose outputs
-        probs = result.probs  # Probs object for classification outputs
+        ymin, xmin, ymax, xmax = obj['bounding_box']
+        xmin = int(xmin * original_numpy.shape[1])
+        xmax = int(xmax * original_numpy.shape[1])
+        ymin = int(ymin * original_numpy.shape[0])
+        ymax = int(ymax * original_numpy.shape[0])
 
         # Grab the class index for the current iteration
-        idx = int(result['class_id'])
+        idx = int(obj['class_id'])
         # Skip the background
         if idx >= len(LABELS):
             continue
@@ -67,15 +65,15 @@ def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, model, threshold)
         cv2.rectangle(original_numpy, (xmin, ymin), (xmax, ymax), 
                     color, 2)
         y = ymin - 15 if ymin - 15 > 15 else ymin + 15
-        label = "{}: {:.2f}%".format(LABELS[result['class_id']],
-            result['score'] * 100)
+        label = "{}: {:.2f}%".format(LABELS[obj['class_id']],
+            obj['score'] * 100)
         cv2.putText(original_numpy, label, (xmin, y),
             cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
         
-        score = result['score'] * 100
+        score = obj['score'] * 100
        
         help.sub_text(str(counter) + ') The model has detected a(an): ' + 
-                      LABELS[result['class_id']] + ' with ' + 
+                      LABELS[obj['class_id']] + ' with ' + 
                       str(score) + ' confidence.')
 
     # Return the final image
@@ -92,18 +90,15 @@ def define_tf_lite_model():
     '''
     # Load the labels and define a color bank
     LABELS = load_labels("final_model/coco_labels.txt")
-    
-    COLORS = np.random.randint(0, 255, size=(len(LABELS), 3), 
-                                dtype="uint8")
 
-    model = YOLO("YOLO-Weights/best.pt")
+    COLORS = np.random.randint(0, 255, size=(len(LABELS), 3), dtype="uint8")
     
-    #interpreter = tf.lite.Interpreter(model_path='final_model/ssd_mobiledet_cpu_coco_int8.tflite')
-    #interpreter.allocate_tensors()
+    interpreter = tf.lite.Interpreter(model_path='final_model/ssd_mobiledet_cpu_coco_int8.tflite')
+    interpreter.allocate_tensors()
     
-    HEIGHT = 640
-    WIDTH  = 640
-    return(LABELS, COLORS, HEIGHT, WIDTH, model)
+    _, HEIGHT, WIDTH, _ = interpreter.get_input_details()[0]['shape']
+    
+    return(LABELS, COLORS, HEIGHT, WIDTH, interpreter)
 
 def load_labels(path):
   '''
