@@ -14,7 +14,7 @@ import re
 import helper as help
 from ultralytics import YOLO
 
-def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, interpreter, threshold):
+def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, model, threshold):
     '''
     
     Main function to read and prepare input, draw boxes and return image
@@ -26,7 +26,7 @@ def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, interpreter, thre
     HEIGHT : Image height defined in define_tf_lite_model()
     WIDTH : Image width in define_tf_lite_model()
     image_path : Where to get the image from, in this app TempDir
-    interpreter : Interpreter defined in define_tf_lite_model()
+    model : Yolo tarained model defined in define_tf_lite_model()
     threshold : The accuracy threshold.
 
     Returns
@@ -35,29 +35,29 @@ def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, interpreter, thre
 
     '''
     # Load the input image and preprocess it
-    input_type = interpreter.get_input_details()[0]['dtype']
+    #input_type = interpreter.get_input_details()[0]['dtype']
     preprocessed_image, original_image = preprocess_image(HEIGHT, WIDTH, image_path, input_type)
     
     # =============Perform inference=====================
+    results=model(img,stream=True)
     
-    results = detect_objects(interpreter, preprocessed_image, threshold=threshold)
+    #results = detect_objects(interpreter, preprocessed_image, threshold=threshold)
 
     # =============Display the results====================
     original_numpy = original_image.numpy()
     counter = 0
-    for obj in results:
+    for result in results:
         # set counter of text
         counter = counter + 1
         # Convert the bounding box figures from relative coordinates
         # to absolute coordinates based on the original resolution
-        ymin, xmin, ymax, xmax = obj['bounding_box']
-        xmin = int(xmin * original_numpy.shape[1])
-        xmax = int(xmax * original_numpy.shape[1])
-        ymin = int(ymin * original_numpy.shape[0])
-        ymax = int(ymax * original_numpy.shape[0])
+        boxes = result.boxes  # Boxes object for bbox outputs
+        masks = result.masks  # Masks object for segmentation masks outputs
+        keypoints = result.keypoints  # Keypoints object for pose outputs
+        probs = result.probs  # Probs object for classification outputs
 
         # Grab the class index for the current iteration
-        idx = int(obj['class_id'])
+        idx = int(result['class_id'])
         # Skip the background
         if idx >= len(LABELS):
             continue
@@ -67,15 +67,15 @@ def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, interpreter, thre
         cv2.rectangle(original_numpy, (xmin, ymin), (xmax, ymax), 
                     color, 2)
         y = ymin - 15 if ymin - 15 > 15 else ymin + 15
-        label = "{}: {:.2f}%".format(LABELS[obj['class_id']],
-            obj['score'] * 100)
+        label = "{}: {:.2f}%".format(LABELS[result['class_id']],
+            result['score'] * 100)
         cv2.putText(original_numpy, label, (xmin, y),
             cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
         
-        score = obj['score'] * 100
+        score = result['score'] * 100
        
         help.sub_text(str(counter) + ') The model has detected a(an): ' + 
-                      LABELS[obj['class_id']] + ' with ' + 
+                      LABELS[result['class_id']] + ' with ' + 
                       str(score) + ' confidence.')
 
     # Return the final image
@@ -103,7 +103,7 @@ def define_tf_lite_model():
     
     HEIGHT = 640
     WIDTH  = 640
-    return(LABELS, COLORS, HEIGHT, WIDTH, interpreter)
+    return(LABELS, COLORS, HEIGHT, WIDTH, model)
 
 def load_labels(path):
   '''
