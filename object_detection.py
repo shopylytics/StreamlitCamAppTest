@@ -12,6 +12,7 @@ import cv2
 import tensorflow as tf
 import re
 import helper as help
+from ultralytics import YOLO
 
 def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, interpreter, threshold):
     '''
@@ -38,6 +39,7 @@ def display_results(LABELS, COLORS, HEIGHT, WIDTH, image_path, interpreter, thre
     preprocessed_image, original_image = preprocess_image(HEIGHT, WIDTH, image_path, input_type)
     
     # =============Perform inference=====================
+    
     results = detect_objects(interpreter, preprocessed_image, threshold=threshold)
 
     # =============Display the results====================
@@ -93,12 +95,14 @@ def define_tf_lite_model():
     
     COLORS = np.random.randint(0, 255, size=(len(LABELS), 3), 
                                 dtype="uint8")
+
+    model = YOLO("YOLO-Weights/best.pt")
     
-    interpreter = tf.lite.Interpreter(model_path='final_model/ssd_mobiledet_cpu_coco_int8.tflite')
-    interpreter.allocate_tensors()
+    #interpreter = tf.lite.Interpreter(model_path='final_model/ssd_mobiledet_cpu_coco_int8.tflite')
+    #interpreter.allocate_tensors()
     
-    _, HEIGHT, WIDTH, _ = interpreter.get_input_details()[0]['shape']
-    
+    HEIGHT = 640
+    WIDTH  = 640
     return(LABELS, COLORS, HEIGHT, WIDTH, interpreter)
 
 def load_labels(path):
